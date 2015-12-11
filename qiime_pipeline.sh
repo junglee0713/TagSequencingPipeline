@@ -17,9 +17,10 @@ DATA_DIR="${WORK_DIR}/data_files"
 JOINED_DIR="${WORK_DIR}/qiime_joined"
 
 PROJECT_DIR="${WORK_DIR}/${PROJECT_NAME}"
-if [! -d $PROJECT_DIR ]; then
+if [ ! -d $PROJECT_DIR ]; then
     mkdir $PROJECT_DIR
 fi
+cp $MAPPING_FP $PROJECT_DIR
 
 LIBRARY_DIR="${PROJECT_DIR}/library"
 OTU_DIR="${PROJECT_DIR}/otu"
