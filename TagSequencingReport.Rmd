@@ -45,7 +45,7 @@ make_pcoa_plot <- function(uu, s, shape_by, color_by) {
     scale_colour_discrete(name=color_by) +
     ggtitle('PCoA plot based on unweighted unifrac distances')
 
-  if (shape_by == '' & color_by!='') {
+  if (shape_by =='' & color_by!='') {
     g_uu <- g_uu + geom_point(aes(colour=factor(get(color_by))))
   } else if (shape_by!='' & color_by!='') {
     g_uu <- g_uu + geom_point(aes(colour=factor(get(color_by)), shape=factor(get(shape_by))))
@@ -58,18 +58,18 @@ make_pcoa_plot <- function(uu, s, shape_by, color_by) {
 
 
 ```{r define_constants code, echo=FALSE}
-# Define file paths
-base_dir <- "/media/8TB_PLAYGROUND/tanesc/friedman/qiime1"
-#base_dir <- "/home/tanesc"
+# User defined variables
+work_dir <- "/media/THING1/tanesc/friedman/SparseFur"
+mapping_file_name <- "SparseFur_sampleSheet.tsv"
 
-work_dir <- file.path(base_dir, "SparseFur")
-mapping_file_fp <- file.path(work_dir, "friedman_qiime_mapping_keepers.tsv")
-otu_table_fp <- file.path(work_dir, "otu", "classic_otu_table.txt")
+# File paths
+mapping_file_fp <- file.path(work_dir, mapping_file_name)
+otu_table_fp <- file.path(work_dir, "otu", "otu_table.txt")
 split_library_log_fp <- file.path(work_dir, "library", "split_library_log.txt")
 uu_fp <- file.path(work_dir, "beta_diversity", "unweighted_unifrac_dm.txt")
 wu_fp <- file.path(work_dir, "beta_diversity", "weighted_normalized_unifrac_dm.txt")
 
-# Define run parameters
+# Run parameters
 min_reads <- 1000
 ```
 
@@ -147,7 +147,7 @@ ggplot(s, aes(x=Read.Counts)) +
 ## Whole samples discarded that are below the read count threshold of 1000
 s$Keep <- s$Read.Counts > min_reads
 s$KeepLabel <- factor(ifelse(s$Keep, "Keep", "Discard"))
-keep_table <- table(s$study_group, s$KeepLabel)
+keep_table <- table(s[,color_by], s$KeepLabel)
 pander(keep_table,caption = "samples lost during prep and sequencing")
 ```
 
