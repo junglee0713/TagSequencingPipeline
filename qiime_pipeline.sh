@@ -3,32 +3,35 @@ set -x
 set -e
 set -u
 
-if [ $# -ne 1 ]; then
-    echo "Usage: $0 WORK_DIR"
+if [ $# -ne 3 ]; then
+    echo "Usage: $0 WORK_DIR MAPPING_FP LANE_NUM"
     exit 1
 fi
 
 WORK_DIR="$1"
+MAPPING_FP="$2"
+LANE_NUM="$3"
+
 DATA_DIR="${WORK_DIR}/data_files"
 JOINED_DIR="${WORK_DIR}/qiime_joined"
 LIBRARY_DIR="${WORK_DIR}/library"
 
 QIIME_PARAMS_FP="/home/tanesc/qiime_parameters.txt"
 
-MAPPING_FP="${WORK_DIR}/sampleSheet.tsv"
-FWD="${DATA_DIR}/Undetermined_S0_L001_R1_001.fastq.gz"
-REV="${DATA_DIR}/Undetermined_S0_L001_R2_001.fastq.gz"
-IDX="${DATA_DIR}/Undetermined_S0_L001_I1_001.fastq.gz"
+#MAPPING_FP="${WORK_DIR}/sampleSheet.tsv"
+FWD="${DATA_DIR}/Undetermined_S0_L$(printf "%03d" $LANE_NUM)_R1_001.fastq"
+REV="${DATA_DIR}/Undetermined_S0_L$(printf "%03d" $LANE_NUM)_R2_001.fastq"
+IDX="${DATA_DIR}/Undetermined_S0_L$(printf "%03d" $LANE_NUM)_I1_001.fastq"
 
-PROJECTS=$(awk '{print $NF}' friedman_qiime_mapping.tsv | uniq)
+PROJECTS=$(awk 'NR>1 {print $NF}' $MAPPING_FP | uniq)
 
-join_paired_ends.py \
-    -f $FWD \
-    -r $REV \
-    -b $IDX \
-    --min_overlap 35 \
-    --perc_max_diff 15 \
-    -o $JOINED_DIR
+#join_paired_ends.py \
+#    -f $FWD \
+#    -r $REV \
+#    -b $IDX \
+#    --min_overlap 35 \
+#    --perc_max_diff 15 \
+#    -o $JOINED_DIR
 
 #split_libraries_fastq.py \
 #    -i "${JOINED_DIR}/fastqjoin.join.fastq" \
@@ -44,15 +47,14 @@ join_paired_ends.py \
 for PROJECT in $PROJECTS
 do
     echo $PROJECT
-
-    ########### where do i make the project specific sample sheet
-    PROJECT_MAPPING_FP="" ######
-
-    PROJECT_SAMPLE_ID="${PROJECT}_sampleNames.txt" ######### look into this!!!!!!!!!!
-    $(cut -f 1 "$PROJECT_MAPPING_FP") > $PROJECT_SAMPLE_ID
-
     PROJECT_DIR="${WORK_DIR}/{PROJECT}"
     mkdir $PROJECT_DIR
+
+    PROJECT_MAPPING_FP="${PROJECT_DIR}/${PROJECT}_sampleSheet.tsv"
+    
+
+    PROJECT_SAMPLE_ID="${PROJECT_DIR}/{PROJECT}_sampleNames.txt"
+    $(cut -f 1 "$PROJECT_MAPPING_FP") > $PROJECT_SAMPLE_ID
     
     PROJECT_LIBRARY_DIR="${PROJECT_DIR}/library"
     PROJECT_OTU_DIR="${PROJECT_DIR}/otu"
