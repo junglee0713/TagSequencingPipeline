@@ -31,9 +31,9 @@ library(reshape2)
 
 ```{r define_functions}
 make_pcoa_plot <- function(uu, s, shape_by, color_by) {
-  uu <- dist_subset(uu, s$SampleIDorig)
   uu_pcoa <- pcoa(uu)
-  uu_df <- cbind(s, uu_pcoa$vectors[s$SampleIDorig, 1:5])
+  uu_df <- merge(s, uu_pcoa$vectors[, 1:5], by.x="SampleIDorig", by.y="row.names")
+  #uu_df <- cbind(s[s$Keep,], uu_pcoa$vectors[, 1:5])
   uu_pct <- round(uu_pcoa$values$Relative_eig * 100)
 
   g_uu = ggplot(uu_df, aes(x=Axis.1, y=Axis.2)) +
@@ -59,8 +59,8 @@ make_pcoa_plot <- function(uu, s, shape_by, color_by) {
 
 ```{r define_constants code, echo=FALSE}
 # User defined variables
-work_dir <- "/media/THING1/tanesc/friedman/SparseFur"
-mapping_file_name <- "SparseFur_sampleSheet.tsv"
+work_dir <- "/media/THING1/tanesc/friedman/BiochemicalGroup"
+mapping_file_name <- "BiochemicalGroup_sampleSheet.tsv"
 
 # File paths
 mapping_file_fp <- file.path(work_dir, mapping_file_name)
@@ -110,11 +110,6 @@ if(length(header_idx)>1){
 }
 ```
 
-```{r echo=FALSE}
-# Assignment counts per SampleID
-cts <- o$counts[,s$SampleID]
-```
-
 ## --------------------------------------------------------
 
 ## Histogram of high quality paired reads per sample
@@ -151,6 +146,11 @@ keep_table <- table(s[,color_by], s$KeepLabel)
 pander(keep_table,caption = "samples lost during prep and sequencing")
 ```
 
+```{r echo=FALSE}
+# Assignment counts per SampleID
+cts <- o$counts[,s$SampleID[s$Keep]]
+```
+
 ## Taxonomic Heatmap
 The most specific taxonomic assignment available for each read is shown. Taxa are included in the plot if more than 1000 observations are made across the entire dataset. "Unassigned" reads did not match any 16S sequence in the reference database at a similarity threshold of 90%
 Taxa are grouped by lowest common ranks for each OTU. Ranks are included in the plot if the combined OTUs reach 1000 observations together.
@@ -180,6 +180,7 @@ otu_heatmap(
 ## Beta diversity measures
 ```{r Ordination_plots_uu, fig.width=7, fig.height=5, echo=FALSE}
 uu <- read_qiime_distmat(uu_fp)
+uu <- dist_subset(uu, s$SampleIDorig[s$Keep])
 g_uu <- make_pcoa_plot(uu, s, shape_by, color_by)
 plot(g_uu)
 ```
@@ -191,6 +192,7 @@ plot(hc, main="Complete linkage clustergram based on\nunweighted unifrac distanc
 
 ```{r Ordination_plots_wu, fig.width=7, fig.height=5, echo=FALSE}
 wu <- read_qiime_distmat(wu_fp)
+wu <- dist_subset(wu, s$SampleIDorig[s$Keep])
 g_wu <- make_pcoa_plot(wu, s, shape_by, color_by)
 plot(g_wu)
 ```
