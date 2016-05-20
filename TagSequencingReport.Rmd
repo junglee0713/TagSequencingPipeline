@@ -42,13 +42,13 @@ make_pcoa_plot <- function(uu, s, shape_by, color_by, title) {
     theme_bw() +
     xlab(paste0("PCoA axis 1 (", uu_pct[1], "%)")) +
     ylab(paste0("PCoA axis 2 (", uu_pct[2], "%)")) +
-    scale_shape_discrete(name=shape_by) + 
-    scale_colour_discrete(name=color_by) +
+    scale_shape_discrete(name=sub("_", " ", shape_by)) + 
+    scale_colour_discrete(name=sub("_", " ", color_by)) +
     ggtitle(title)
 
-  if (shape_by =='' & color_by!='') {
+  if (is.null(shape_by) & is.null(color_by)) {
     g_uu <- g_uu + geom_point(aes(colour=factor(get(color_by))))
-  } else if (shape_by!='' & color_by!='') {
+  } else if (!is.null(shape_by) & !is.null(color_by)) {
     g_uu <- g_uu + geom_point(aes(colour=factor(get(color_by)), shape=factor(get(shape_by))))
   } else {
     g_uu <- g_uu + geom_point()
@@ -60,15 +60,12 @@ make_pcoa_plot <- function(uu, s, shape_by, color_by, title) {
 
 ```{r define_constants code, echo=FALSE}
 # User defined variables
-work_dir <- "/media/THING1/tanesc/usda/usda_16S_error0"
-mapping_file_name <- "mapping_file.tsv"
+mapping_file_fp <- "mapping_file.tsv"
 
-# File paths
-mapping_file_fp <- file.path(work_dir, mapping_file_name)
-otu_table_fp <- file.path(work_dir, "otu", "otu_table.txt")
-split_library_log_fp <- file.path(work_dir, "library", "split_library_log.txt")
-uu_fp <- file.path(work_dir, "beta_diversity", "unweighted_unifrac_dm.txt")
-wu_fp <- file.path(work_dir, "beta_diversity", "weighted_normalized_unifrac_dm.txt")
+otu_table_fp <- file.path("otu", "otu_table.txt")
+split_library_log_fp <- file.path("library", "split_library_log.txt")
+uu_fp <- file.path("beta_diversity", "unweighted_unifrac_dm.txt")
+wu_fp <- file.path("beta_diversity", "weighted_normalized_unifrac_dm.txt")
 
 # Run parameters
 min_reads <- 1000
@@ -98,8 +95,8 @@ problem_ids <- setdiff( colnames(o$counts), s$SampleID)
 if (length(problem_ids ) > 0) stop (simpleError(paste("id mismatch found", problem_ids, collapse=" ")))
 
 # check for the column names to assign color_by and shape_by for pcoa plots
-color_by = ''
-shape_by = ''
+color_by <- NULL
+shape_by <- NULL
 potential_headers <- c('study_group', 'study_day', 'current_antibiotics', 'cage_number', 'mouse_strain')
 header_idx = which(is.element(potential_headers, colnames(s)))
 
@@ -146,6 +143,7 @@ ggplot(s, aes(x=Read.Counts)) +
 ```{r}
 ## Whole samples discarded that are below the read count threshold of 1000
 s$Keep <- s$Read.Counts > min_reads
+s$Keep[grep("geneblock", s$SampleID, ignore.case = TRUE)] <- FALSE
 s$KeepLabel <- factor(ifelse(s$Keep, "Keep", "Discard"))
 keep_table <- table(s[,color_by], s$KeepLabel)
 pander(keep_table,caption = "samples lost during prep and sequencing")
@@ -178,7 +176,6 @@ otu_heatmap(
   a,
   #annotation=annotations,
   threshold=1000,
-  #color = saturated_rainbow(max(colSums(cts)), saturation_limit = 0.50),
   cluster_cols = FALSE, cluster_rows = FALSE,
   fontsize_col = 10, fontsize_row = 10,
   cellheight=10, cellwidth=10,
@@ -207,12 +204,16 @@ plot(hc, main="UPGMA linkage clustergram based on\nunweighted unifrac distances"
 
 \newpage
 
+Here, we use weighted UniFrac distance to compare samples. Plots are described above.
+
 ```{r Ordination_plots_wu, fig.width=6, fig.height=5, echo=FALSE, warning=FALSE}
 wu <- read_qiime_distmat(wu_fp)
 wu <- dist_subset(wu, s$SampleIDorig[s$Keep])
-g_wu <- make_pcoa_plot(wu, s, shape_by, color_by, 'PCoA plot based on weighted UniFrac distances')
+g_wu <- make_pcoa_plot(wu, s, shape_by, color_by, 'PCoA plot based on\nweighted normalized UniFrac distances')
 plot(g_wu)
 ```
+
+\newpage
 
 ```{r Cluster_by_study_wu, fig.width=6, fig.height=5, echo=FALSE}
 hc = hclust(wu, method="average")
