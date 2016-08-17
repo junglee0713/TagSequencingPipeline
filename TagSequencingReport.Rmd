@@ -159,9 +159,15 @@ pander(keep_table,caption = "samples lost during prep and sequencing")
 cts <- o$counts[,s$SampleID[s$Keep]]
 
 # filter the unassigned
-idx_un <- which(a!="Unassigned")
-a <- a[idx_un]
-cts <- cts[idx_un,]
+is_mitochondrial <- grepl("mitochondria", adf$Family)
+is_chloroplast <- grepl("Chloroplast", adf$Class)
+is_unassigned <- grepl("Unassigned", adf$Kingdom)
+is_contam <- is_mitochondrial | is_chloroplast | is_unassigned
+write.table(a[is_contam], file="excluded_otus.tsv", quote=F, sep='\t')
+cts <- cts[!is_contam,]
+a <- a[!is_contam]
+adf <- adf[!is_contam,]
+rm(is_contam, is_mitochondrial, is_chloroplast, is_unassigned)
 ```
 
 ## Taxonomic Heatmap
