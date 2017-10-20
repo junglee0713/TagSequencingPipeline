@@ -70,7 +70,6 @@ source("R_functions.R")
 <!--   End of Preamble                                                                                -->
 <!-- ================================================================================================ -->
 
-
 <!-- ================================================================================================ -->
 <!--   Beginning of Project Specific Items                                                            -->
 <!-- ================================================================================================ -->
@@ -161,19 +160,19 @@ rm(is_contam, is_mitochondrial, is_chloroplast, is_unassigned, is_archaea)
 
 ### read counts
 read_counts <- read.table(file=read_count_fp, header=F, as.is=T, sep=",") %>%
-  dplyr::rename(SampleID=V1) %>%
+  dplyr::rename(SampleIDorig=V1) %>%
   dplyr::rename(Read_Counts=V2)
-s <- merge(s, read_counts, by="SampleID", all.x=T)
+s <- merge(s, read_counts, by="SampleIDorig", all.x=T)
 
 ### number of observed OTUs
 notu <- read.table(file=notu_fp, header=T, sep="\t", as.is=T) %>%
-  dplyr::rename(SampleID=X)
-s <- merge(s, notu, by="SampleID", all.x=T)
+  dplyr::rename(SampleIDorig=X)
+s <- merge(s, notu, by="SampleIDorig", all.x=T)
 
 ### Shannon measure
 shannon <- read.table(file=shannon_fp, header=T, sep="\t", as.is=T) %>%
-  dplyr::rename(SampleID=X)
-s <- merge(s, shannon, by="SampleID", all.x=T)
+  dplyr::rename(SampleIDorig=X)
+s <- merge(s, shannon, by="SampleIDorig", all.x=T)
 ```
 
 ```{r}
