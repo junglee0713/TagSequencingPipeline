@@ -80,10 +80,16 @@ source("R_functions.R")
 ### ===========================
 
 ### run date
-run_date <- "October 3rd, 2017"
+run_date <- "PLEASE FILL ME IN WITH A DATE SUCH AS October 3rd, 2017"
 
 ### investigator
-investigator <- "Mark Brown"
+investigator <- "PLEASE FILL ME IN WITH INVESTIGATOR NAME SUCH AS Mark Brown"
+
+### minimum reads threshold
+min_reads <- 1000
+
+### rarefying subsample size 
+richness_subsample_size <- 1000
 
 ### data files directory
 data_files_dir <- "data_files"
@@ -91,36 +97,30 @@ data_files_dir <- "data_files"
 ### porject directory
 proj_dir <- "16s"
 
-### mapping file
+### mapping file path
+#mapping_file_fp <- file.path(data_files_dir, "PLEASE FILL ME IN WITH MAPPING FILE NAME SUCH AS 20171003_brown_mapping_file.txt")
 mapping_file_fp <- file.path(data_files_dir, "20171003_brown_mapping_file.txt")
 
 ### per-sample read count 
 read_count_fp <- file.path(proj_dir, "table", "sample-frequency-detail.csv")
 
-### otu table
+### otu table file path
 feature_table_fp <- file.path(proj_dir, "table", "feature-table.tsv")
 
 ### taxonomic assignment 
 taxo_assignment_fp <- file.path(proj_dir, "taxonomy", "taxonomy.tsv")
 
-### unweighted UniFrac
+### unweighted UniFrac file path
 uu_fp <- file.path(proj_dir, "core-metrics-results", "uu", "distance-matrix.tsv")
 
-### weighted UniFrac
+### weighted UniFrac file path
 wu_fp <- file.path(proj_dir, "core-metrics-results", "wu", "distance-matrix.tsv")
 
-### num of observed otu
-notu_fp <- file.path(proj_dir, "core-metrics-results", "observed_otu", "alpha-diversity.tsv")
-
-### shannon
-shannon_fp <- file.path(proj_dir, "core-metrics-results", "shannon", "alpha-diversity.tsv")
-
-### minimum reads threshold
-min_reads <- 1000
+### faith
+faith_fp <- file.path(proj_dir, "core-metrics-results", "faith", "alpha-diversity.tsv")
 ```
 
-
-```{r}
+```{r, warning=F}
 ### ===========================
 ###   read in data
 ### ===========================
@@ -128,16 +128,34 @@ min_reads <- 1000
 ### read mapping file
 s <- read_qiime_mapping_file(mapping_file_fp) 
 
+### check for the column names to assign color_by and shape_by for pcoa plots
+color_by <- NULL
+shape_by <- NULL
+potential_headers <- c("study_group", "SampleType", "study_day", "cage_number")
+header_idx = which(is.element(potential_headers, colnames(s)))
+if(length(header_idx)>0) {
+  color_by <- potential_headers[header_idx[1]]
+}
+if(length(header_idx)>1) {
+  shape_by <- potential_headers[header_idx[2]]
+}
+
 ### Check if the sample names start with a number. If they do, add an "X" to the front
 toFix = grepl("^[0-9]", s$SampleID)
 s$SampleIDorig = s$SampleID
 s$SampleID[toFix] = paste0('X', s$SampleID[toFix])
+s$SampleID <- gsub("-", ".", s$SampleID)
 
 ### read otu table
-o <- read.table(feature_table_fp, skip=1, header=T, as.is=T, sep="\t", comment.char="", fill=T)
+o <- read.table(feature_table_fp, skip=1, header=T, as.is=T, sep="\t", comment.char="")
 rownames(o) <- o$X.OTU.ID
-counts <- o %>%
-  select(-X.OTU.ID, -taxonomy)
+counts <- o %>% select(-X.OTU.ID) %>% as.matrix()
+
+### get read counts
+read_counts <- colSums(counts) %>% 
+  melt() %>% 
+  dplyr::rename(Read_Counts=value) 
+s <- merge(s, read_counts, by.x="SampleID", by.y="row.names", all.x=T)
 
 ### taxonomic assignment
 ta <- read.table(file=taxo_assignment_fp, header=T, sep="\t", as.is=T)
@@ -153,26 +171,22 @@ is_mitochondrial <- grepl("mitochondria", adf$Family)
 is_chloroplast <- grepl("Chloroplast", adf$Class)
 is_unassigned <- grepl("Unassigned", adf$Kingdom)
 is_archaea <- grepl("Archaea", adf$Kingdom)
-is_contam <- is_mitochondrial | is_chloroplast | is_unassigned
+is_contam <- is_mitochondrial | is_chloroplast | is_unassigned ### Archaea kept to check positive control samples
 counts <- counts[!is_contam,]
 adf <- adf[!is_contam,]
 rm(is_contam, is_mitochondrial, is_chloroplast, is_unassigned, is_archaea)
 
-### read counts
-read_counts <- read.table(file=read_count_fp, header=F, as.is=T, sep=",") %>%
-  dplyr::rename(SampleIDorig=V1) %>%
-  dplyr::rename(Read_Counts=V2)
-s <- merge(s, read_counts, by="SampleIDorig", all.x=T)
+### alpha diversity measures: richness and shannon
+s <- s %>%
+  merge(diversity(t(counts)), by.x="SampleID", by.y="row.names", all.x=T) %>%
+  dplyr::rename(shannon = y) %>%
+  merge(rarefy(t(counts), richness_subsample_size), by.x="SampleID", by.y="row.names", all.x=T) %>%
+  dplyr::rename(richness = y) 
 
-### number of observed OTUs
-notu <- read.table(file=notu_fp, header=T, sep="\t", as.is=T) %>%
+### alpha diversity measures: faith
+faith <- read.table(file=faith_fp, header=T, sep="\t", as.is=T) %>%
   dplyr::rename(SampleIDorig=X)
-s <- merge(s, notu, by="SampleIDorig", all.x=T)
-
-### Shannon measure
-shannon <- read.table(file=shannon_fp, header=T, sep="\t", as.is=T) %>%
-  dplyr::rename(SampleIDorig=X)
-s <- merge(s, shannon, by="SampleIDorig", all.x=T)
+s <- merge(s, faith, by="SampleIDorig", all.x=T)
 ```
 
 ```{r}
@@ -188,15 +202,6 @@ s <- merge(s, shannon, by="SampleIDorig", all.x=T)
 common_sample_list <- intersect(s$SampleID, colnames(counts))
 s <- s[s$SampleID %in% common_sample_list, ]
 counts <- counts[, common_sample_list]
-
-### possible issue 2: keep only samples that are related with the investigator
-s <- s[s$investigator=="Mark Brown", ]
-counts <- counts[, s$SampleID]
-
-### misc data preprocessing
-color_by <- "time_collected"
-shape_by <- "cage_number"
-s$cage_number <- as.factor(s$cage_number)
 ```
 
 # Introduction
@@ -236,7 +241,7 @@ prop_cut <- 0.01
 satu_limit <- 0.4
 ```
 
-The heatmap was generated from the most specific taxonomic assignments. Each column represents one sample and each row represents one taxon. Taxa were included in the chart if the abundance in any sample exceeded `r 100*prop_cut`%. 
+Each column of the heatmap represents one sample and each row represents one taxon, typically a genus. Taxa were included in the chart if the abundance in any sample exceeded `r 100*prop_cut`%. 
 
 The chart is colored white if taxa were not observed in the sample, dark blue if taxa were observed at very low abundance. This allows the reader to quickly survey presence/absence. Abundance values exceeding `r 100*satu_limit`% are colored red, indicating an extremely dominant species.
 
@@ -244,7 +249,7 @@ The chart is colored white if taxa were not observed in the sample, dark blue if
 s_toPlot <- s[s$Keep,] %>%
   mutate(study_group=as.character(study_group))
 cts_toPlot <- counts[, s_toPlot$SampleID]  
-a <- simplify_assignments(adf, rank1="Phylum", rank2="Species")
+a <- simplify_assignments(adf, rank1="Phylum", rank2="Genus")
 summed_cts <- rowsum(cts_toPlot, a) 
 summed_props <- sweep(summed_cts, 2, colSums(summed_cts), "/") 
 grps <- c(color_by, shape_by)
@@ -257,15 +262,14 @@ heatmap_grouped(summed_props, s_toPlot, grps=grps, thre=0.01, option=2, prop_cut
 
 # Alpha Diversity
 
-Alpha diversity was assessd by the number of observed OTUs and Shannon index.
+Alpha diversity was assessd by the expected number of observed OTUs (out of rarefying sample size of `r richness_subsample_size`), Shannon index, and Faith’s phylogenetic diversity.
 
 ## Number of observed OTUs
 
-```{r, fig.height=3}
-alpha_measure <- "observed_otus"
+```{r, fig.height=2.5}
+alpha_measure <- "richness"
 
 s %>% filter(Keep) %>%
-  filter(!is.na(time_collected)) %>%
   ggplot(aes(x=eval(parse(text=color_by)), y=eval(parse(text=alpha_measure)), color=eval(parse(text=color_by)))) +
   geom_boxplot() +
   labs(y=alpha_measure, x=color_by, color=color_by) +
@@ -276,11 +280,24 @@ s %>% filter(Keep) %>%
 
 ## Shannon Index
 
-```{r, fig.height=3}
+```{r, fig.height=2.5}
 alpha_measure <- "shannon"
 
 s %>% filter(Keep) %>%
-  filter(!is.na(time_collected)) %>%
+  ggplot(aes(x=eval(parse(text=color_by)), y=eval(parse(text=alpha_measure)), color=eval(parse(text=color_by)))) +
+  geom_boxplot() +
+  labs(y=alpha_measure, x=color_by, color=color_by) +
+  theme_bw() +
+  theme(axis.text.x=element_text(angle=-25, hjust= .1)) +
+  scale_color_brewer(palette = "Set2")
+```
+
+## Faith’s Phylogenetic Diversity
+
+```{r, fig.height=2.5}
+alpha_measure <- "faith_pd"
+
+s %>% filter(Keep) %>%
   ggplot(aes(x=eval(parse(text=color_by)), y=eval(parse(text=alpha_measure)), color=eval(parse(text=color_by)))) +
   geom_boxplot() +
   labs(y=alpha_measure, x=color_by, color=color_by) +
@@ -313,8 +330,8 @@ The `r dist_name` was employed to compare the species composition of the samples
 ### PCoA plot
 
 ```{r, fig.width=6, fig.height=5, echo=FALSE, warning=FALSE}
-s_toPlot <- s[s$Read_Counts > min_reads, ]
-s_toPlot$Keep <- ifelse(grepl("geneblock|freewater|control", s_toPlot$SampleID, ignore.case = TRUE), FALSE, TRUE)
+s_toPlot <- s[s$Keep, ]
+s_toPlot$Keep <- ifelse(grepl("geneblock|freewater|extractemptywell", s_toPlot$SampleID, ignore.case = TRUE), FALSE, TRUE)
 
 dist_in <- read_qiime_distmat(dist_fp)
 dist_in <- dist_subset(dist_in, s_toPlot$SampleID[s_toPlot$Keep])
@@ -354,8 +371,8 @@ The `r dist_name` was employed to compare the species composition of the samples
 ### PCoA plot
 
 ```{r, fig.width=6, fig.height=5, echo=FALSE, warning=FALSE}
-s_toPlot <- s[s$Read_Counts > min_reads, ]
-s_toPlot$Keep <- ifelse(grepl("geneblock|freewater|control", s_toPlot$SampleID, ignore.case = TRUE), FALSE, TRUE)
+s_toPlot <- s[s$Keep, ]
+s_toPlot$Keep <- ifelse(grepl("geneblock|freewater|extractemptywell", s_toPlot$SampleID, ignore.case = TRUE), FALSE, TRUE)
 
 dist_in <- read_qiime_distmat(dist_fp)
 dist_in <- dist_subset(dist_in, s_toPlot$SampleID[s_toPlot$Keep])
@@ -379,5 +396,5 @@ plot(hc, main=paste0("UPGMA linkage clustergram based on\n", dist_name), xlab=""
 
 # APPENDIX: Counts of high quality paired reads for each sample
 ```{r}
-pander(read_counts)
+s %>% select(SampleID, Read_Counts) %>% arrange(-Read_Counts) %>% pander()
 ```
