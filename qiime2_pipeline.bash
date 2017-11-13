@@ -1,6 +1,6 @@
 #!/bin/bash
 
-if [ $# -ne 4 ]; then
+if [ $# -ne 3 ]; then
 	echo "Usage: $0 WORK_DIR MAPPING_FP PROJECT_NAME"
 	exit 1
 fi
