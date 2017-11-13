@@ -101,9 +101,6 @@ proj_dir <- "16s"
 #mapping_file_fp <- file.path(data_files_dir, "PLEASE FILL ME IN WITH MAPPING FILE NAME SUCH AS 20171003_brown_mapping_file.txt")
 mapping_file_fp <- file.path(data_files_dir, "20171003_brown_mapping_file.txt")
 
-### per-sample read count 
-read_count_fp <- file.path(proj_dir, "table", "sample-frequency-detail.csv")
-
 ### otu table file path
 feature_table_fp <- file.path(proj_dir, "table", "feature-table.tsv")
 

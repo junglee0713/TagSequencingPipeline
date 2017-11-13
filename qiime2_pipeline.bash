@@ -1,14 +1,13 @@
 #!/bin/bash
 
 if [ $# -ne 4 ]; then
-	echo "Usage: $0 WORK_DIR MAPPING_FP LANE_NUM PROJECT_NAME"
+	echo "Usage: $0 WORK_DIR MAPPING_FP PROJECT_NAME"
 	exit 1
 fi
 
 WORK_DIR=$1
 MAPPING_FP=$2
-LANE_NUM=$3
-PROJECT_NAME=$4
+PROJECT_NAME=$3
 
 ## Taxonomy classifier setup. Two classifiers are currently available:
 ## classifiers trained on full length and on 515F/806R region of Greengenes 13_8 99% OTUs
@@ -18,6 +17,10 @@ PROJECT_NAME=$4
 CLASSIFIER_FP="${HOME}/gg-13-8-99-nb-classifier.qza"
 #CLASSIFIER_FP="${HOME}/gg-13-8-99-515-806-nb-classifier.qza" ## used for V4 region
 
+### PATH TO Ceylan's CODE TO COMBINE I1 and I2
+
+INDEX1_INDEX2_COMBINE_SCRIPT="${HOME}/combine_barcodes.py"
+
 DATA_DIR="${WORK_DIR}/data_files"
 
 PROJECT_DIR="${WORK_DIR}/${PROJECT_NAME}"
@@ -25,10 +28,40 @@ if [ ! -d ${PROJECT_DIR} ]; then
 	mkdir ${PROJECT_DIR}
 fi
 
-FORMATTED_LANE_NUM=$(printf "%03d" ${LANE_NUM})
-FWD="${DATA_DIR}/Undetermined_S0_L${FORMATTED_LANE_NUM}_R1_001.fastq.gz"
-REV="${DATA_DIR}/Undetermined_S0_L${FORMATTED_LANE_NUM}_R2_001.fastq.gz"
-IDX="${DATA_DIR}/Undetermined_S0_L${FORMATTED_LANE_NUM}_I12_001.fastq.gz"
+###=====================
+### gunzip INDEX1 AND INDEX2, IF NECESSARY
+###=====================
+
+if [ -e "${DATA_DIR}/Undetermined_S0_L001_I1_001.fastq.gz" ]; then
+	gunzip "${DATA_DIR}/Undetermined_S0_L001_I1_001.fastq.gz"
+fi
+
+if [ -e "${DATA_DIR}/Undetermined_S0_L001_I2_001.fastq.gz" ]; then
+        gunzip "${DATA_DIR}/Undetermined_S0_L001_I2_001.fastq.gz"
+fi
+
+###=====================
+### gzip R1 AND R2, IF NECESSARY
+###=====================
+
+if [ -e "${DATA_DIR}/Undetermined_S0_L001_R1_001.fastq" ]; then
+        gzip "${DATA_DIR}/Undetermined_S0_L001_R1_001.fastq"
+fi
+
+if [ -e "${DATA_DIR}/Undetermined_S0_L001_R2_001.fastq" ]; then
+        gzip "${DATA_DIR}/Undetermined_S0_L001_R2_001.fastq"
+fi
+
+###=====================
+### COMBINE INDEX1 AND INDEX2 AND gzip
+###=====================
+
+python ${INDEX1_INDEX2_COMBINE_SCRIPT} ${DATA_DIR}
+gzip "${DATA_DIR}/Undetermined_S0_L001_I12_001.fastq"
+
+FWD="${DATA_DIR}/Undetermined_S0_L001_R1_001.fastq.gz"
+REV="${DATA_DIR}/Undetermined_S0_L001_R2_001.fastq.gz"
+IDX="${DATA_DIR}/Undetermined_S0_L001_I12_001.fastq.gz"
 
 ###=====================
 ### DATA IMPORT
@@ -39,14 +72,14 @@ if [ ! -d ${EMP_PAIRED_END_SEQUENCES_DIR} ]; then
         mkdir ${EMP_PAIRED_END_SEQUENCES_DIR}
 fi
 
-cp ${FWD} "${EMP_PAIRED_END_SEQUENCES_DIR}/forward.fastq.gz"
-cp ${REV} "${EMP_PAIRED_END_SEQUENCES_DIR}/reverse.fastq.gz"
-cp ${IDX} "${EMP_PAIRED_END_SEQUENCES_DIR}/barcodes.fastq.gz"
+mv ${FWD} "${EMP_PAIRED_END_SEQUENCES_DIR}/forward.fastq.gz"
+mv ${REV} "${EMP_PAIRED_END_SEQUENCES_DIR}/reverse.fastq.gz"
+mv ${IDX} "${EMP_PAIRED_END_SEQUENCES_DIR}/barcodes.fastq.gz"
 
 qiime tools import \
   --type EMPPairedEndSequences \
-  --input-path $EMP_PAIRED_END_SEQUENCES_DIR \
-  --output-path "$PROJECT_DIR/emp-paired-end-sequences.qza"
+  --input-path ${EMP_PAIRED_END_SEQUENCES_DIR} \
+  --output-path "${PROJECT_DIR}/emp-paired-end-sequences.qza"
 
 ###=====================
 ### DEMULTIPLEXING SEQUENCE
@@ -56,8 +89,8 @@ qiime demux emp-paired \
   --m-barcodes-file ${MAPPING_FP} \
   --m-barcodes-category BarcodeSequence \
   --i-seqs "${PROJECT_DIR}/emp-paired-end-sequences.qza" \
-  --o-per-sample-sequences "${PROJECT_DIR}/demux.qza" \
-  --p-rev-comp-mapping-barcodes ## need discussion here (careful with EOF above)
+  ## --p-rev-comp-mapping-barcodes \ ## use if mapping file BarcodeSequence nees to be reverse complemented
+  --o-per-sample-sequences "${PROJECT_DIR}/demux.qza"
 
 qiime demux summarize \
   --i-data "${PROJECT_DIR}/demux.qza" \
