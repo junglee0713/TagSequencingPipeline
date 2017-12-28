@@ -51,7 +51,7 @@ split_libraries_fastq.py \
     -o $LIBRARY_DIR \
     --rev_comp_mapping_barcodes \
     --barcode_type golay_12 \
-    --max_barcode_errors=2
+    --max_barcode_errors=0
 
 pick_de_novo_otus.py \
     --input_fp "${LIBRARY_DIR}/seqs.fna" \
